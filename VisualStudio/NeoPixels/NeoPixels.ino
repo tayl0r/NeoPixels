@@ -13,12 +13,13 @@
 #define BUTTON_PIN    1  // button on Trinket Pin #1 (digital)
 
 #define MODE_WHITE                  0
-//#define MODE_SOLID_COLOR            1
-#define MODE_DYNAMIC_COLOR          1
+#define MODE_SOLID_COLOR            1
+#define MODE_SOLID_COLOR_PULSATE    2
+#define MODE_DYNAMIC_COLOR          3
 //#define MODE_RAINBOW                2
 //#define MODE_THEATER_CHASE_RAINBOW  2
 //#define MODE_RAINBOW_CYCLE          3
-#define MODE_MAX                    2
+#define MODE_MAX                    4
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = Arduino pin number (most are valid)
@@ -38,8 +39,9 @@ volatile int buttonState = 0;
 int buttonStateLast = -1;
 volatile int potValue = 50;
 int potValueLast = -1;
-int mode = 1;
+int mode = 3;
 byte c = 100;
+bool toggle = false;
 
 CHSV hsv;
 CRGB rgb;
@@ -78,30 +80,42 @@ void loop() {
 	if (buttonState != buttonStateLast) {
 		if (buttonState == HIGH) {
 			mode++;
+      hsv.s = 255;
 		}
 	}
 
 	if (mode % MODE_MAX == MODE_WHITE) {
     hsv.h = 255;
+    hsv.s = 0;
     hsv.v = potValue;
     hsv2rgb_rainbow(hsv, rgb);
     colorFill(rgb);
 	}
-	//  else if (mode % MODE_MAX == MODE_RAINBOW) {
-	//    rainbow(20);
-	//  }
-	//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
-	//    theaterChaseRainbow(50);
-	//  }
-	//  else if (mode % MODE_MAX == MODE_RAINBOW_CYCLE) {
-	//    rainbowCycle(20);
-	//  }
-	//  else if (mode % MODE_MAX == MODE_SOLID_COLOR) {
-	//    c = potValue;
-	//    potValue = 50;
-	//    colorFill(Wheel(c));
-	//  }
-	else if (mode % MODE_MAX == MODE_DYNAMIC_COLOR) {
+//  else if (mode % MODE_MAX == MODE_RAINBOW) {
+//    rainbow(20);
+//  }
+//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
+//    theaterChaseRainbow(50);
+//  }
+//  else if (mode % MODE_MAX == MODE_RAINBOW_CYCLE) {
+//    rainbowCycle(20);
+//  }
+  else if (mode % MODE_MAX == MODE_SOLID_COLOR) {
+    hsv.h = potValue;
+    hsv2rgb_rainbow(hsv, rgb);
+    colorFill(rgb);
+  }
+  else if (mode % MODE_MAX == MODE_SOLID_COLOR_PULSATE) {
+    c += toggle ? 5 : -5;
+    if (c >= 255 || c <= 0) {
+      toggle = !toggle;
+    }
+    hsv.v = c;
+    hsv2rgb_rainbow(hsv, rgb);
+    colorFill(rgb);
+    delay(map(potValue, 0, 255, 0, 25));
+  }
+  else if (mode % MODE_MAX == MODE_DYNAMIC_COLOR) {
 		c++;
 		hsv.h = c;
 		hsv.v = potValue;
