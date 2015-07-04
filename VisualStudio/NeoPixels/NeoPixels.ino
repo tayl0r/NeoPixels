@@ -12,14 +12,17 @@
 #define POT_PIN       1  // Potentiometer sweep (center) on Trinket Pin #2 (Analog 1)
 #define BUTTON_PIN    1  // button on Trinket Pin #1 (digital)
 
+#define NUM_PIXELS 90
+const float HUE_PER_PIXEL = 255.0 / 90.0;
+
 #define MODE_WHITE                  0
 #define MODE_SOLID_COLOR            1
 #define MODE_SOLID_COLOR_PULSATE    2
 #define MODE_DYNAMIC_COLOR          3
-//#define MODE_RAINBOW                2
+#define MODE_RAINBOW                4
 //#define MODE_THEATER_CHASE_RAINBOW  2
 //#define MODE_RAINBOW_CYCLE          3
-#define MODE_MAX                    4
+#define MODE_MAX                    5
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = Arduino pin number (most are valid)
@@ -28,7 +31,7 @@
 //   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
 //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(90, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 // IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
 // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
@@ -41,7 +44,9 @@ volatile int potValue = 50;
 int potValueLast = -1;
 int mode = 3;
 byte c = 100;
+int16_t cc = 0;
 bool toggle = false;
+float f = 0;
 
 CHSV hsv;
 CRGB rgb;
@@ -80,42 +85,51 @@ void loop() {
 	if (buttonState != buttonStateLast) {
 		if (buttonState == HIGH) {
 			mode++;
-      hsv.s = 255;
+			hsv.s = 255;
+			cc = 0;
 		}
 	}
 
 	if (mode % MODE_MAX == MODE_WHITE) {
-    hsv.h = 255;
-    hsv.s = 0;
-    hsv.v = potValue;
-    hsv2rgb_rainbow(hsv, rgb);
-    colorFill(rgb);
+		hsv.h = 255;
+		hsv.s = 0;
+		hsv.v = potValue;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
 	}
-//  else if (mode % MODE_MAX == MODE_RAINBOW) {
-//    rainbow(20);
-//  }
-//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
-//    theaterChaseRainbow(50);
-//  }
-//  else if (mode % MODE_MAX == MODE_RAINBOW_CYCLE) {
-//    rainbowCycle(20);
-//  }
-  else if (mode % MODE_MAX == MODE_SOLID_COLOR) {
-    hsv.h = potValue;
-    hsv2rgb_rainbow(hsv, rgb);
-    colorFill(rgb);
-  }
-  else if (mode % MODE_MAX == MODE_SOLID_COLOR_PULSATE) {
-    c += toggle ? 5 : -5;
-    if (c >= 255 || c <= 0) {
-      toggle = !toggle;
-    }
-    hsv.v = c;
-    hsv2rgb_rainbow(hsv, rgb);
-    colorFill(rgb);
-    delay(map(potValue, 0, 255, 0, 25));
-  }
-  else if (mode % MODE_MAX == MODE_DYNAMIC_COLOR) {
+	else if (mode % MODE_MAX == MODE_RAINBOW) {
+		hsv.v = potValue;
+		cc++;
+		colorFillRainbow(cc);
+		delay(100);
+	}
+	//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
+	//    theaterChaseRainbow(50);
+	//  }
+	//  else if (mode % MODE_MAX == MODE_RAINBOW_CYCLE) {
+	//    rainbowCycle(20);
+	//  }
+	else if (mode % MODE_MAX == MODE_SOLID_COLOR) {
+		hsv.h = potValue;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
+	}
+	else if (mode % MODE_MAX == MODE_SOLID_COLOR_PULSATE) {
+		cc += toggle ? 5 : -5;
+		if (cc <= 0) {
+			cc = 0;
+			toggle = !toggle;
+		}
+		else if (cc >= 255) {
+			cc = 255;
+			toggle = !toggle;
+		}
+		hsv.v = cc;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
+		delay(map(potValue, 0, 255, 0, 25));
+	}
+	else if (mode % MODE_MAX == MODE_DYNAMIC_COLOR) {
 		c++;
 		hsv.h = c;
 		hsv.v = potValue;
@@ -166,24 +180,36 @@ SIGNAL(TIMER0_COMPA_vect) {
 
 // Fill the dots one after the other with a color
 void colorWipe(uint32_t c, uint8_t wait) {
-	for (uint16_t i = 0; i<strip.numPixels(); i++) {
+	for (uint16_t i = 0; i < NUM_PIXELS; i++) {
 		strip.setPixelColor(i, c);
 		strip.show();
 		delay(wait);
 	}
 }
 
+void colorFillRainbow(uint16_t offset) {
+	f = offset;
+	for (uint16_t i = 0; i < NUM_PIXELS; ++i) {
+		f += HUE_PER_PIXEL;
+		hsv.h = f;
+		//hsv.h = (offset + i) % 256;
+		hsv2rgb_rainbow(hsv, rgb);
+		strip.setPixelColor(i, rgb.r, rgb.g, rgb.b);
+	}
+	strip.show();
+}
+
 // Fill all the dots instantly
 void colorFill(CRGB rgb) {
-  for (uint16_t i = 0; i<strip.numPixels(); i++) {
-    strip.setPixelColor(i, rgb.r, rgb.g, rgb.b);
-  }
-  strip.show();
+	for (uint16_t i = 0; i < NUM_PIXELS; i++) {
+		strip.setPixelColor(i, rgb.r, rgb.g, rgb.b);
+	}
+	strip.show();
 }
 
 // Fill all the dots instantly
 void colorFill(uint32_t c) {
-	for (uint16_t i = 0; i<strip.numPixels(); i++) {
+	for (uint16_t i = 0; i < NUM_PIXELS; i++) {
 		strip.setPixelColor(i, c);
 	}
 	strip.show();
@@ -192,8 +218,8 @@ void colorFill(uint32_t c) {
 void rainbow(uint8_t wait) {
 	uint16_t i, j;
 
-	for (j = 0; j<256; j++) {
-		for (i = 0; i<strip.numPixels(); i++) {
+	for (j = 0; j < 256; j++) {
+		for (i = 0; i < NUM_PIXELS; i++) {
 			//strip.setPixelColor(i, Wheel((i + j) & 255));
 		}
 		strip.show();
@@ -205,9 +231,9 @@ void rainbow(uint8_t wait) {
 void rainbowCycle(uint8_t wait) {
 	uint16_t i, j;
 
-	for (j = 0; j<256 * 5; j++) { // 5 cycles of all colors on wheel
-		for (i = 0; i< strip.numPixels(); i++) {
-			//strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+	for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
+		for (i = 0; i < NUM_PIXELS; i++) {
+			//strip.setPixelColor(i, Wheel(((i * 256 / NUM_PIXELS) + j) & 255));
 		}
 		strip.show();
 		delay(wait);
@@ -216,16 +242,16 @@ void rainbowCycle(uint8_t wait) {
 
 //Theatre-style crawling lights.
 void theaterChase(uint32_t c, uint8_t wait) {
-	for (int j = 0; j<10; j++) {  //do 10 cycles of chasing
+	for (int j = 0; j < 10; j++) {  //do 10 cycles of chasing
 		for (int q = 0; q < 3; q++) {
-			for (int i = 0; i < strip.numPixels(); i = i + 3) {
+			for (int i = 0; i < NUM_PIXELS; i = i + 3) {
 				//strip.setPixelColor(i + q, c);    //turn every third pixel on
 			}
 			strip.show();
 
 			delay(wait);
 
-			for (int i = 0; i < strip.numPixels(); i = i + 3) {
+			for (int i = 0; i < NUM_PIXELS; i = i + 3) {
 				//strip.setPixelColor(i + q, 0);        //turn every third pixel off
 			}
 		}
@@ -236,14 +262,14 @@ void theaterChase(uint32_t c, uint8_t wait) {
 void theaterChaseRainbow(uint8_t wait) {
 	for (int j = 0; j <= 765; j++) {     // cycle all 256 colors in the wheel
 		for (int q = 0; q < 3; q++) {
-			for (int i = 0; i < strip.numPixels(); i = i + 3) {
+			for (int i = 0; i < NUM_PIXELS; i = i + 3) {
 				//strip.setPixelColor(i + q, Wheel((i + j) % 765));    //turn every third pixel on
 			}
 			strip.show();
 
 			delay(wait);
 
-			for (int i = 0; i < strip.numPixels(); i = i + 3) {
+			for (int i = 0; i < NUM_PIXELS; i = i + 3) {
 				strip.setPixelColor(i + q, 0);        //turn every third pixel off
 			}
 		}
