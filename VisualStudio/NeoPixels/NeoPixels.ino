@@ -5,15 +5,10 @@
 
 #include <Adafruit_NeoPixel.h>
 #include <avr/power.h> // Comment out this line for non-AVR boards (Arduino Due, etc.)
-
 #include <pixeltypes.h>
 
-#define LED_PIN       0  // LEDs on Trinket Pin #0
 #define POT_PIN       1  // Potentiometer sweep (center) on Trinket Pin #2 (Analog 1)
 #define BUTTON_PIN    1  // button on Trinket Pin #1 (digital)
-
-#define NUM_PIXELS 90
-const float HUE_PER_PIXEL = 255.0 / 90.0;
 
 #define MODE_WHITE                  0
 #define MODE_SOLID_COLOR            1
@@ -23,6 +18,17 @@ const float HUE_PER_PIXEL = 255.0 / 90.0;
 //#define MODE_THEATER_CHASE_RAINBOW  2
 //#define MODE_RAINBOW_CYCLE          3
 #define MODE_MAX                    5
+
+//#define OFFICE
+#ifdef OFFICE
+#define LED_PIN       0  // LEDs on Trinket Pin #0
+#define NUM_PIXELS 90
+const float HUE_PER_PIXEL = 255.0 / 90.0;
+#else
+#define LED_PIN       13  // LEDs on arduino uno pin #13
+#define NUM_PIXELS 150
+const float HUE_PER_PIXEL = 255.0 / 90.0;
+#endif
 
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = Arduino pin number (most are valid)
@@ -42,7 +48,7 @@ volatile int buttonState = 0;
 int buttonStateLast = -1;
 volatile int potValue = 50;
 int potValueLast = -1;
-int mode = 3;
+int mode = 4;
 byte c = 100;
 int16_t cc = 0;
 bool toggle = false;
@@ -58,11 +64,13 @@ void setup() {
 #endif
 	// End of trinket special code
 
+#ifdef OFFICE
 	pinMode(BUTTON_PIN, INPUT);
 	//  digitalWrite(BUTTON_PIN, HIGH);  // enable pullup resistor
 	//  attachInterrupt(0, pinChange, RISING); // 0 interrupt is for pin #2
 
 	TIMSK |= _BV(OCIE0A);    // Turn on the compare interrupt (below!)
+#endif
 
 
 	strip.begin();
@@ -74,108 +82,6 @@ void setup() {
 	rgb.r = 0;
 	rgb.g = 0;
 	rgb.b = 0;
-}
-
-void loop() {
-	//pinChange();
-
-	// check if the pushbutton is pressed.
-	// if it is, the buttonState is HIGH:
-	buttonState = digitalRead(BUTTON_PIN);
-	if (buttonState != buttonStateLast) {
-		if (buttonState == HIGH) {
-			mode++;
-			hsv.s = 255;
-			cc = 0;
-		}
-	}
-
-	if (mode % MODE_MAX == MODE_WHITE) {
-		hsv.h = 255;
-		hsv.s = 0;
-		hsv.v = potValue;
-		hsv2rgb_rainbow(hsv, rgb);
-		colorFill(rgb);
-	}
-	else if (mode % MODE_MAX == MODE_RAINBOW) {
-		hsv.v = potValue;
-		cc++;
-		colorFillRainbow(cc);
-		delay(100);
-	}
-	//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
-	//    theaterChaseRainbow(50);
-	//  }
-	//  else if (mode % MODE_MAX == MODE_RAINBOW_CYCLE) {
-	//    rainbowCycle(20);
-	//  }
-	else if (mode % MODE_MAX == MODE_SOLID_COLOR) {
-		hsv.h = potValue;
-		hsv2rgb_rainbow(hsv, rgb);
-		colorFill(rgb);
-	}
-	else if (mode % MODE_MAX == MODE_SOLID_COLOR_PULSATE) {
-		cc += toggle ? 5 : -5;
-		if (cc <= 0) {
-			cc = 0;
-			toggle = !toggle;
-		}
-		else if (cc >= 255) {
-			cc = 255;
-			toggle = !toggle;
-		}
-		hsv.v = cc;
-		hsv2rgb_rainbow(hsv, rgb);
-		colorFill(rgb);
-		delay(map(potValue, 0, 255, 0, 25));
-	}
-	else if (mode % MODE_MAX == MODE_DYNAMIC_COLOR) {
-		c++;
-		hsv.h = c;
-		hsv.v = potValue;
-		hsv2rgb_rainbow(hsv, rgb);
-		colorFill(rgb);
-		delay(300);
-	}
-
-	// set last values so we know what changed
-	buttonStateLast = buttonState;
-	potValueLast = potValue;
-
-	//  // Some example procedures showing how to display to the pixels:
-	//  colorWipe(strip.Color(255, 0, 0), 50); // Red
-	//  colorWipe(strip.Color(0, 255, 0), 50); // Green
-	//  colorWipe(strip.Color(0, 0, 255), 50); // Blue
-	//  // Send a theater pixel chase in...
-	//  theaterChase(strip.Color(127, 127, 127), 50); // White
-	//  theaterChase(strip.Color(127,   0,   0), 50); // Red
-	//  theaterChase(strip.Color(  0,   0, 127), 50); // Blue
-	//
-	//  rainbow(20);
-	//  rainbowCycle(20);
-	//  theaterChaseRainbow(50);
-}
-
-//void pinChange() {
-//  // read the state of the pushbutton value:
-//  mode++;
-//}
-
-// We'll take advantage of the built in millis() timer that goes off
-// The SIGNAL(TIMER0_COMPA_vect) function is the interrupt that will be
-// Called by the microcontroller every 2 milliseconds
-volatile uint8_t counter = 0;
-SIGNAL(TIMER0_COMPA_vect) {
-	// this gets called every 2 milliseconds
-	counter += 2;
-	// every 20 milliseconds, read inputs
-	if (counter >= 20) {
-		counter = 0;
-
-		// read the knob
-		potValue = analogRead(POT_PIN);
-		potValue = map(potValue, 0, 1023, 0, 255);
-	}
 }
 
 // Fill the dots one after the other with a color
@@ -275,4 +181,108 @@ void theaterChaseRainbow(uint8_t wait) {
 		}
 	}
 }
+
+void loop() {
+#ifdef OFFICE
+	// check if the pushbutton is pressed.
+	// if it is, the buttonState is HIGH:
+	buttonState = digitalRead(BUTTON_PIN);
+	if (buttonState != buttonStateLast) {
+		if (buttonState == HIGH) {
+			mode++;
+			hsv.s = 255;
+			cc = 0;
+		}
+	}
+#endif
+
+	if (mode % MODE_MAX == MODE_WHITE) {
+		hsv.h = 255;
+		hsv.s = 0;
+		hsv.v = potValue;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
+	}
+	else if (mode % MODE_MAX == MODE_RAINBOW) {
+		hsv.v = potValue;
+		cc++;
+		colorFillRainbow(cc);
+		//delay(100);
+	}
+	//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
+	//    theaterChaseRainbow(50);
+	//  }
+	//  else if (mode % MODE_MAX == MODE_RAINBOW_CYCLE) {
+	//    rainbowCycle(20);
+	//  }
+	else if (mode % MODE_MAX == MODE_SOLID_COLOR) {
+		hsv.h = potValue;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
+	}
+	else if (mode % MODE_MAX == MODE_SOLID_COLOR_PULSATE) {
+		cc += toggle ? 5 : -5;
+		if (cc <= 0) {
+			cc = 0;
+			toggle = !toggle;
+		}
+		else if (cc >= 255) {
+			cc = 255;
+			toggle = !toggle;
+		}
+		hsv.v = cc;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
+		delay(map(potValue, 0, 255, 0, 25));
+	}
+	else if (mode % MODE_MAX == MODE_DYNAMIC_COLOR) {
+		c++;
+		hsv.h = c;
+		hsv.v = potValue;
+		hsv2rgb_rainbow(hsv, rgb);
+		colorFill(rgb);
+		delay(300);
+	}
+
+	// set last values so we know what changed
+	buttonStateLast = buttonState;
+	potValueLast = potValue;
+
+	//  // Some example procedures showing how to display to the pixels:
+	//  colorWipe(strip.Color(255, 0, 0), 50); // Red
+	//  colorWipe(strip.Color(0, 255, 0), 50); // Green
+	//  colorWipe(strip.Color(0, 0, 255), 50); // Blue
+	//  // Send a theater pixel chase in...
+	//  theaterChase(strip.Color(127, 127, 127), 50); // White
+	//  theaterChase(strip.Color(127,   0,   0), 50); // Red
+	//  theaterChase(strip.Color(  0,   0, 127), 50); // Blue
+	//
+	//  rainbow(20);
+	//  rainbowCycle(20);
+	//  theaterChaseRainbow(50);
+}
+
+//void pinChange() {
+//  // read the state of the pushbutton value:
+//  mode++;
+//}
+
+#ifdef OFFICE
+// We'll take advantage of the built in millis() timer that goes off
+// The SIGNAL(TIMER0_COMPA_vect) function is the interrupt that will be
+// Called by the microcontroller every 2 milliseconds
+volatile uint8_t counter = 0;
+SIGNAL(TIMER0_COMPA_vect) {
+	// this gets called every 2 milliseconds
+	counter += 2;
+	// every 20 milliseconds, read inputs
+	if (counter >= 20) {
+		counter = 0;
+
+		// read the knob
+		potValue = analogRead(POT_PIN);
+		potValue = map(potValue, 0, 1023, 0, 255);
+	}
+}
+#endif
 
