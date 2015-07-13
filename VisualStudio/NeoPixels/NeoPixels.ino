@@ -7,9 +7,6 @@
 #include <avr/power.h> // Comment out this line for non-AVR boards (Arduino Due, etc.)
 #include <pixeltypes.h>
 
-#define POT_PIN       1  // Potentiometer sweep (center) on Trinket Pin #2 (Analog 1)
-#define BUTTON_PIN    1  // button on Trinket Pin #1 (digital)
-
 #define MODE_WHITE                  0
 #define MODE_SOLID_COLOR            1
 #define MODE_SOLID_COLOR_PULSATE    2
@@ -21,13 +18,18 @@
 
 //#define OFFICE
 #ifdef OFFICE
+#define POT_PIN       1  // Potentiometer sweep (center) on Trinket Pin #2 (Analog 1)
+#define BUTTON_PIN    1  // button on Trinket Pin #1 (digital)
 #define LED_PIN       0  // LEDs on Trinket Pin #0
 #define NUM_PIXELS 90
 const float HUE_PER_PIXEL = 255.0 / 90.0;
 #else
-#define LED_PIN       13  // LEDs on arduino uno pin #13
+#define POT_PIN       0  // Potentiometer sweep (center)
+#define BUTTON_PIN    3  // button 1
+#define BUTTON_PIN2   4  // button 2
+#define LED_PIN       8
 #define NUM_PIXELS 150
-const float HUE_PER_PIXEL = 255.0 / 90.0;
+const float HUE_PER_PIXEL = 255.0 / 150.0;
 #endif
 
 // Parameter 1 = number of pixels in strip
@@ -48,7 +50,7 @@ volatile int buttonState = 0;
 int buttonStateLast = -1;
 volatile int potValue = 50;
 int potValueLast = -1;
-int mode = 4;
+int mode = 3;
 byte c = 100;
 int16_t cc = 0;
 bool toggle = false;
@@ -64,12 +66,25 @@ void setup() {
 #endif
 	// End of trinket special code
 
-#ifdef OFFICE
+#ifdef BUTTON_PIN
 	pinMode(BUTTON_PIN, INPUT);
+#endif
+#ifdef BUTTON_PIN2
+	pinMode(BUTTON_PIN2, INPUT);
+#endif
 	//  digitalWrite(BUTTON_PIN, HIGH);  // enable pullup resistor
 	//  attachInterrupt(0, pinChange, RISING); // 0 interrupt is for pin #2
 
-	TIMSK |= _BV(OCIE0A);    // Turn on the compare interrupt (below!)
+#ifdef POT_PIN
+	cli(); // stop interrupts
+  #ifdef TIMSK0
+	// this is for arduino trinket pro / uno
+	TIMSK0 |= _BV(OCIE0A);
+  #endif
+  #ifdef TIMSK
+	// this is for trinket
+	//TIMSK |= _BV(OCIE0A);    // Turn on the compare interrupt (below!)
+  #endif
 #endif
 
 
@@ -78,10 +93,14 @@ void setup() {
 
 	hsv.h = 0;
 	hsv.s = 255;
-	hsv.v = 100;
+	hsv.v = 50;
 	rgb.r = 0;
 	rgb.g = 0;
 	rgb.b = 0;
+
+#ifndef POT_PIN
+	potValue = 150;
+#endif
 }
 
 // Fill the dots one after the other with a color
@@ -183,7 +202,7 @@ void theaterChaseRainbow(uint8_t wait) {
 }
 
 void loop() {
-#ifdef OFFICE
+#ifdef BUTTON_PIN
 	// check if the pushbutton is pressed.
 	// if it is, the buttonState is HIGH:
 	buttonState = digitalRead(BUTTON_PIN);
@@ -207,7 +226,7 @@ void loop() {
 		hsv.v = potValue;
 		cc++;
 		colorFillRainbow(cc);
-		//delay(100);
+		delay(100);
 	}
 	//  else if (mode % MODE_MAX == MODE_THEATER_CHASE_RAINBOW) {
 	//    theaterChaseRainbow(50);
@@ -267,7 +286,7 @@ void loop() {
 //  mode++;
 //}
 
-#ifdef OFFICE
+#ifdef POT_PIN
 // We'll take advantage of the built in millis() timer that goes off
 // The SIGNAL(TIMER0_COMPA_vect) function is the interrupt that will be
 // Called by the microcontroller every 2 milliseconds
